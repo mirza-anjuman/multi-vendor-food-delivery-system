@@ -208,84 +208,132 @@ const MenuPage: React.FC = () => {
     };
   }, [hasMore, isLoading, isLoadingMore, loadMore]);
 
+  const [isSearchCollapsed, setIsSearchCollapsed] = useState(false);
+
+  // Monitor scroll intent to collapse search/controls row on scroll-down, reveal on scroll-up
+  useEffect(() => {
+    let lastY = 0;
+
+    const handleScroll = () => {
+      const currentY = window.scrollY;
+      const diff = currentY - lastY;
+
+      if (currentY > 150) {
+        if (diff > 8) {
+          setIsSearchCollapsed(true);
+        } else if (diff < -8) {
+          setIsSearchCollapsed(false);
+        }
+      } else {
+        setIsSearchCollapsed(false);
+      }
+      lastY = currentY;
+    };
+
+    // Also handle wheel events for immediate responsiveness on desktop
+    const handleWheel = (e: WheelEvent) => {
+      if (window.scrollY > 80) {
+        if (e.deltaY > 15) {
+          setIsSearchCollapsed(true);
+        } else if (e.deltaY < -15) {
+          setIsSearchCollapsed(false);
+        }
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("wheel", handleWheel, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("wheel", handleWheel);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50/50 pb-24">
       {/* ── Page Header & Sticky Discovery Bar ── */}
       <div className="sticky top-20 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm transition-all duration-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
-          {/* Top Search & Controls: Mobile Column / Desktop Row */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
-            {/* Search Input */}
-            <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search food, dishes, restaurants, cuisines..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="w-full pl-10 pr-9 py-2.5 bg-gray-100/80 hover:bg-gray-100 focus:bg-white text-sm font-medium text-gray-900 rounded-2xl border border-transparent focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10 transition-all min-h-[44px]"
-                aria-label="Search food items"
-              />
-              {searchInput && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5">
+          {/* Top Search & Controls: Collapsible on scroll down */}
+          <div
+            className={cn(
+              "overflow-hidden transition-all duration-300 ease-in-out",
+              isSearchCollapsed ? "max-h-0 opacity-0 mb-0 pointer-events-none hidden" : "max-h-96 opacity-100 mb-2.5"
+            )}
+          >
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 pt-1">
+              {/* Search Input */}
+              <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search food, dishes, restaurants, cuisines..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="w-full pl-10 pr-9 py-2.5 bg-gray-100/80 hover:bg-gray-100 focus:bg-white text-sm font-medium text-gray-900 rounded-2xl border border-transparent focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10 transition-all min-h-[44px]"
+                  aria-label="Search food items"
+                />
+                {searchInput && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchInput("");
+                      updateUrlParams({ search: "" });
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
+                    aria-label="Clear search text"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Controls Row: Grouping Toggle + Filters + Sort */}
+              <div className="flex items-center gap-2 sm:gap-3 justify-between sm:justify-end">
+                {/* Group Similar Dishes Across Multi-Vendors Toggle */}
                 <button
                   type="button"
-                  onClick={() => {
-                    setSearchInput("");
-                    updateUrlParams({ search: "" });
-                  }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
-                  aria-label="Clear search text"
+                  onClick={() => setIsClustered((prev) => !prev)}
+                  className={cn(
+                    "rounded-2xl px-3 h-11 text-xs font-semibold min-h-[44px] shadow-xs flex items-center gap-1.5 transition-colors border",
+                    isClustered
+                      ? "bg-brand-50 border-brand-200 text-brand-700"
+                      : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50",
+                  )}
+                  title={
+                    isClustered
+                      ? "Consolidating identical dishes across restaurants"
+                      : "Showing every restaurant's individual dish offer"
+                  }
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>{isClustered ? "Grouped" : "All Offers"}</span>
                 </button>
-              )}
-            </div>
 
-            {/* Controls Row: Grouping Toggle + Filters + Sort */}
-            <div className="flex items-center gap-2 sm:gap-3 justify-between sm:justify-end">
-              {/* Group Similar Dishes Across Multi-Vendors Toggle */}
-              <button
-                type="button"
-                onClick={() => setIsClustered((prev) => !prev)}
-                className={cn(
-                  "rounded-2xl px-3 h-11 text-xs font-semibold min-h-[44px] shadow-xs flex items-center gap-1.5 transition-colors border",
-                  isClustered
-                    ? "bg-brand-50 border-brand-200 text-brand-700"
-                    : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50",
-                )}
-                title={
-                  isClustered
-                    ? "Consolidating identical dishes across restaurants"
-                    : "Showing every restaurant's individual dish offer"
-                }
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>{isClustered ? "Grouped" : "All Offers"}</span>
-              </button>
+                {/* Filter Sheet Trigger Button */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsFilterSheetOpen(true)}
+                  className="relative rounded-2xl border-gray-200 bg-white hover:bg-gray-50 px-3.5 h-11 text-xs font-semibold text-gray-700 min-h-[44px] shadow-xs flex-shrink-0"
+                  aria-label={`Open filters (${activeFiltersCount} active)`}
+                >
+                  <SlidersHorizontal className="w-4 h-4 mr-1.5 text-gray-500" />
+                  <span>Filters</span>
+                  {activeFiltersCount > 0 && (
+                    <span className="ml-1.5 w-5 h-5 rounded-full bg-brand-500 text-white text-[11px] font-extrabold flex items-center justify-center">
+                      {activeFiltersCount}
+                    </span>
+                  )}
+                </Button>
 
-              {/* Filter Sheet Trigger Button */}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsFilterSheetOpen(true)}
-                className="relative rounded-2xl border-gray-200 bg-white hover:bg-gray-50 px-3.5 h-11 text-xs font-semibold text-gray-700 min-h-[44px] shadow-xs flex-shrink-0"
-                aria-label={`Open filters (${activeFiltersCount} active)`}
-              >
-                <SlidersHorizontal className="w-4 h-4 mr-1.5 text-gray-500" />
-                <span>Filters</span>
-                {activeFiltersCount > 0 && (
-                  <span className="ml-1.5 w-5 h-5 rounded-full bg-brand-500 text-white text-[11px] font-extrabold flex items-center justify-center">
-                    {activeFiltersCount}
-                  </span>
-                )}
-              </Button>
-
-              {/* Sort Control */}
-              <div className="flex-shrink-0">
-                <SortControl
-                  currentSort={filters.sort}
-                  onSortChange={(sort) => updateUrlParams({ sort })}
-                />
+                {/* Sort Control */}
+                <div className="flex-shrink-0">
+                  <SortControl
+                    currentSort={filters.sort}
+                    onSortChange={(sort) => updateUrlParams({ sort })}
+                  />
+                </div>
               </div>
             </div>
           </div>

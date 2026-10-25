@@ -1,5 +1,6 @@
 import homeService from "@/services/homeService";
 import type { TopCategory } from "@/types/home";
+import { resolveFoodImage } from "@/utils/foodImage";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -11,8 +12,37 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import "swiper/css/navigation";
 
-const fallbackCategoryImage =
-  "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=500&q=80";
+// Category to representative dish mapping for authentic photography fallback
+const CATEGORY_CANONICAL_DISH_MAP: Record<string, string> = {
+  sides: "French Fries",
+  chicken: "Crispy Fried Chicken",
+  "burgers & sandwiches": "Classic Beef Burger",
+  "bhorta & sides": "Aloo Bhorta",
+  "curry & bhuna": "Beef Curry",
+  "rice & biryani": "Chicken Biryani",
+  snacks: "Samosa / Singara",
+  beverages: "Iced Tea",
+  dessert: "Chocolate Brownie",
+  healthy: "Coleslaw",
+  italian: "Margherita Pizza",
+  asian: "Fried Rice",
+  mexican: "Beef Taco",
+};
+
+const resolveCategoryImageUrl = (categoryName: string, existingImage?: string): string => {
+  if (existingImage && !existingImage.includes("placeholder") && !existingImage.includes("default")) {
+    return existingImage;
+  }
+  const normalized = categoryName.trim().toLowerCase();
+  const canonicalDishName = CATEGORY_CANONICAL_DISH_MAP[normalized];
+  if (canonicalDishName) {
+    const resolved = resolveFoodImage(canonicalDishName);
+    if (resolved?.src) return resolved.src;
+  }
+  const directResolved = resolveFoodImage(categoryName);
+  if (directResolved?.src) return directResolved.src;
+  return resolveFoodImage("French Fries")?.src || "/src/assets/foods/biryani.webp";
+};
 
 const TopFoodCategories: React.FC = () => {
   const navigate = useNavigate();
@@ -146,7 +176,7 @@ const TopFoodCategories: React.FC = () => {
                       data-index={index}
                     >
                       <img
-                        src={category.image || fallbackCategoryImage}
+                        src={resolveCategoryImageUrl(category.name, category.image)}
                         alt={category.name}
                         className="w-full h-full object-cover"
                       />

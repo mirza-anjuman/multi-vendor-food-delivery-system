@@ -22,7 +22,11 @@ type PopularRestaurantCard = {
   tags: string[];
 };
 
-const PopularRestaurants: React.FC = () => {
+interface PopularRestaurantsProps {
+  excludeIds?: string[];
+}
+
+const PopularRestaurants: React.FC<PopularRestaurantsProps> = ({ excludeIds = [] }) => {
   const [restaurants, setRestaurants] = useState<PopularRestaurant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -31,7 +35,8 @@ const PopularRestaurants: React.FC = () => {
     setIsLoading(true);
     setErrorMessage(null);
 
-    const response = await homeService.getPopularRestaurants(6);
+    // Fetch up to 12 so that after deduplicating against Nearby Restaurants, we still have 6 unique popular ones
+    const response = await homeService.getPopularRestaurants(12);
     if (response.success && response.data) {
       setRestaurants(response.data.restaurants || []);
     } else {
@@ -47,7 +52,10 @@ const PopularRestaurants: React.FC = () => {
   }, [loadRestaurants]);
 
   const mappedRestaurants = useMemo<PopularRestaurantCard[]>(() => {
-    return restaurants.map((restaurant) => {
+    const excludeSet = new Set(excludeIds);
+    const filtered = restaurants.filter((r) => !excludeSet.has(r._id));
+
+    return filtered.slice(0, 6).map((restaurant) => {
       const cuisine = restaurant.cuisineType?.[0] || "Local favorite";
       const rating = restaurant.rating?.average ?? 0;
       const location =
@@ -77,7 +85,7 @@ const PopularRestaurants: React.FC = () => {
         tags: tags.length > 0 ? tags : ["Popular"],
       };
     });
-  }, [restaurants]);
+  }, [restaurants, excludeIds]);
 
   return (
     <section className="py-20">

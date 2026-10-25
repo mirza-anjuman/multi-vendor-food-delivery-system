@@ -20,10 +20,28 @@ export const CategoryPills: React.FC<CategoryPillsProps> = memo(
     isLoading = false,
   }) => {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const activePillRef = useRef<HTMLButtonElement>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
 
     const isAllSelected = selectedCategories.length === 0;
+
+    // Scroll active selected pill into view smoothly inside horizontal container
+    useEffect(() => {
+      if (activePillRef.current && scrollContainerRef.current) {
+        const container = scrollContainerRef.current;
+        const pill = activePillRef.current;
+        const pillLeft = pill.offsetLeft;
+        const pillWidth = pill.offsetWidth;
+        const containerWidth = container.offsetWidth;
+        const targetScrollLeft = pillLeft - (containerWidth / 2) + (pillWidth / 2);
+
+        container.scrollTo({
+          left: Math.max(0, targetScrollLeft),
+          behavior: "smooth",
+        });
+      }
+    }, [selectedCategories]);
 
     // Check scroll position to update arrows/edge fades
     const updateScrollAffordance = useCallback(() => {
@@ -109,6 +127,7 @@ export const CategoryPills: React.FC<CategoryPillsProps> = memo(
                 return (
                   <button
                     key={cat.name}
+                    ref={isSelected ? activePillRef : null}
                     type="button"
                     onClick={() => onToggleCategory(cat.name)}
                     aria-pressed={isSelected}

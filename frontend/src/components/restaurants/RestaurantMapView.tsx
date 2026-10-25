@@ -176,13 +176,15 @@ const RestaurantInfoCard: React.FC<{
           </div>
 
           <div className="flex items-center gap-2 mt-2">
-            <Button
-              size="sm"
-              onClick={onBook}
-              className="bg-brand-500 hover:bg-brand-600 text-white text-xs px-4"
-            >
-              Book a table
-            </Button>
+            {restaurant.reservationSettings?.isEnabled && (
+              <Button
+                size="sm"
+                onClick={onBook}
+                className="bg-brand-500 hover:bg-brand-600 text-white text-xs px-4"
+              >
+                Book a table
+              </Button>
+            )}
             {restaurant.distance !== undefined && (
               <Badge variant="outline" className="text-xs">
                 <Navigation className="w-3 h-3 mr-1" />

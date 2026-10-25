@@ -9,7 +9,6 @@ import {
   RestaurantCardSkeleton,
   RestaurantMapView,
 } from '@/components/restaurants';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -32,11 +31,9 @@ import type {
 import { cn } from '@/utils/cn';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Award,
   CalendarRange,
   MapPin,
   Search,
-  Sparkles,
   Star,
   X,
 } from 'lucide-react';
@@ -72,6 +69,12 @@ interface ApiRestaurant {
   deliveryFee?: number;
   priceRange?: number;
   isTemporarilyClosed?: boolean;
+  reservationSettings?: {
+    isEnabled?: boolean;
+    totalSeats?: number;
+    minPartySize?: number;
+    maxPartySize?: number;
+  };
 }
 
 interface ApiRestaurantsResponse {
@@ -258,6 +261,7 @@ const mapRestaurant = (
     amenities: toAmenities(item),
     priceRange: toPriceRange(item.priceRange, item.deliveryFee),
     coordinates,
+    reservationSettings: item.reservationSettings,
   };
 };
 
@@ -610,16 +614,6 @@ const RestaurantsPage: React.FC = () => {
     [filteredRestaurants, displayCount],
   );
 
-  const recommendedRestaurants = useMemo(
-    () => displayedRestaurants.filter((r) => r.isRecommended),
-    [displayedRestaurants],
-  );
-
-  const regularRestaurants = useMemo(
-    () => displayedRestaurants.filter((r) => !r.isRecommended),
-    [displayedRestaurants],
-  );
-
   const hasMore = displayCount < filteredRestaurants.length;
 
   const handleLoadMore = useCallback(() => {
@@ -968,55 +962,15 @@ const RestaurantsPage: React.FC = () => {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                 >
-                  {recommendedRestaurants.length > 0 && (
-                    <section
-                      className="mb-10"
-                      aria-labelledby="recommended-heading"
+                  <section aria-labelledby="all-restaurants-heading">
+                    <h2
+                      id="all-restaurants-heading"
+                      className="sr-only"
                     >
-                      <div className="mb-4 flex items-center gap-2">
-                        <Award className="h-5 w-5 text-brand-500" />
-                        <h2
-                          id="recommended-heading"
-                          className="text-lg font-semibold text-gray-900"
-                        >
-                          Recommended for you
-                        </h2>
-                        <Badge variant="orange" className="text-xs">
-                          {recommendedRestaurants.length}
-                        </Badge>
-                      </div>
-                      {renderGrid(recommendedRestaurants)}
-                    </section>
-                  )}
-
-                  {recommendedRestaurants.length > 0 &&
-                    regularRestaurants.length > 0 && (
-                      <div className="relative my-8">
-                        <div className="absolute inset-0 flex items-center">
-                          <div className="w-full border-t border-gray-200" />
-                        </div>
-                        <div className="relative flex justify-center">
-                          <span className="bg-gray-50/60 px-4 text-sm font-medium text-gray-500">
-                            All restaurants
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                  {regularRestaurants.length > 0 && (
-                    <section aria-labelledby="all-restaurants-heading">
-                      {recommendedRestaurants.length === 0 && (
-                        <h2
-                          id="all-restaurants-heading"
-                          className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900"
-                        >
-                          <Sparkles className="h-5 w-5 text-brand-500" />
-                          All restaurants
-                        </h2>
-                      )}
-                      {renderGrid(regularRestaurants)}
-                    </section>
-                  )}
+                      All restaurants
+                    </h2>
+                    {renderGrid(displayedRestaurants)}
+                  </section>
 
                   {/* Infinite-scroll sentinel + fallback button */}
                   {hasMore && (

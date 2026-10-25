@@ -455,4 +455,44 @@ npx ts-node scripts/backfill-restaurant-locations.ts        # Dry-run restaurant
 npx ts-node scripts/backfill-restaurant-locations.ts --commit # Apply coordinates to MongoDB
 ```
 
+### 13. Customer Location & Discovery Standards
+
+#### Location & Delivery Hook (`useCustomerLocation` & `useDeliveryQuote`)
+- **Customer Location (`LocationContext`)**:
+  - Global provider in `@/contexts/LocationContext`.
+  - Persists selected coordinates in `localStorage` (`foodrush_user_coordinates`).
+  - Automatically loads and sets default user address when authenticated via `userService.getProfile()`.
+  - Browser geolocation is requested **ONLY** upon explicit customer tap on the "Use current location" button; never prompted unexpectedly on page load.
+  - Interactive map modal (`LocationModal` & `LocationPicker`) allows precise pin adjustments and quick selection of saved addresses.
+- **Delivery Quote Hook (`useDeliveryQuote`)**:
+  - Live quote calculation using `deliveryService.quoteDelivery(...)` for single restaurants.
+  - Automatically re-quotes when customer coordinates change or when opened from `LocationPicker`.
+  - Flags approximate distance when straight-line fallback applies (`isEstimate: true`).
+
+### 14. Menu Item Discovery & Features Architecture
+
+#### 1. Price Comparison Pipeline (`/api/menu-items/:id/compare`)
+- **Backend Matching Service**: `backend/src/services/menu/dish-comparison.service.ts` backed by `dish-matcher.service.ts`.
+- **Matching Rules**: Normalizes dish names, detects protein qualifiers (beef, chicken, mutton, fish, prawn), strips portion tags, and enforces mutually exclusive cooking styles (e.g. *fry* vs *curry* vs *biryani* vs *tehari* vs *bhuna*). **Precision over recall**: false positives are strictly rejected.
+- **Geographic Awareness**: Computes distance and road delivery fees using server-authoritative delivery settings when coordinates are provided.
+- **Highlights Calculation**: Dynamically tags matches with `"Lowest price"`, `"Lowest total"`, `"Top rated"`, and `"Nearest"`.
+- **UI Degradation**: Skeletons during load; completely hides the section if 0 confident alternatives exist.
+
+#### 2. Deterministic Complementary Pairings (`/api/menu-items/:id/pairings`)
+- **Backend Service**: `backend/src/services/menu/dish-pairings.service.ts`.
+- **Ranking Signals**:
+  1. Real order co-occurrence frequency within the same order / sub-order history.
+  2. Category taxonomy pairing matrix (`CATEGORY_PAIRING_RULES`: mains → sides, drinks, desserts; snacks → beverages; burgers → fries, shakes).
+  3. Popular fallback items.
+- **Cart-Aware Exclusion**: Items already present in the active cart or the current item are filtered out.
+- **Same-Kitchen Priority**: Items from the same restaurant are ranked first to minimize additional fees and split checkouts.
+
+#### 3. AI Nutrition & Calorie Estimates (`/api/menu-items/:id/nutrition`)
+- **Backend Service**: `backend/src/services/nutrition/nutrition.service.ts`.
+- **Vendor Precedence**: If restaurant vendor provided explicit nutrition data on the dish, it is displayed immediately, labeled *"Provided by the restaurant"*.
+- **Async AI Generation & Cache**: OpenAI-compatible adapter calls chat completions with `reasoning: { effort: "none" }`, sanitized inputs, and Zod output schema parsing.
+- **Plausibility Bounds**: Clamped between 30 and 3,500 kcal per serving. Strict mitigation prevents prompt injection, medical claims, or allergen assumptions.
+- **Persistence**: Cached permanently in `NutritionEstimate` collection keyed by normalized dish name and portion descriptor.
+
+
 

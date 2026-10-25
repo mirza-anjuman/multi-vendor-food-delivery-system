@@ -21,6 +21,12 @@ export interface Restaurant {
     lat: number;
     lng: number;
   };
+  reservationSettings?: {
+    isEnabled?: boolean;
+    totalSeats?: number;
+    minPartySize?: number;
+    maxPartySize?: number;
+  };
 }
 
 export type RestaurantType =

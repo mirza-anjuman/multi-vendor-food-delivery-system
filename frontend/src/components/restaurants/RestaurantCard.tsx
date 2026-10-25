@@ -268,16 +268,18 @@ const RestaurantCard: React.FC<RestaurantCardProps> = memo(
 
             {/* Action Bar */}
             <div className="flex items-center gap-2">
-              <InteractiveCardAction>
-                <Button
-                  onClick={handleBookClick}
-                  className="bg-gradient-to-r from-brand-500 to-red-500 hover:from-brand-600 hover:to-red-600 text-white font-medium px-4 rounded-lg transition-colors h-9"
-                  size="sm"
-                  aria-label={`Book a table at ${restaurant.name}`}
-                >
-                  Book a table
-                </Button>
-              </InteractiveCardAction>
+              {restaurant.reservationSettings?.isEnabled && (
+                <InteractiveCardAction>
+                  <Button
+                    onClick={handleBookClick}
+                    className="bg-gradient-to-r from-brand-500 to-red-500 hover:from-brand-600 hover:to-red-600 text-white font-medium px-4 rounded-lg transition-colors h-9"
+                    size="sm"
+                    aria-label={`Book a table at ${restaurant.name}`}
+                  >
+                    Book a table
+                  </Button>
+                </InteractiveCardAction>
+              )}
 
               <InteractiveCardAction>
                 <Button

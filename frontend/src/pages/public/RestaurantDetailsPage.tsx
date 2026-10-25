@@ -20,6 +20,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
+import { useCustomerLocation } from "@/contexts/LocationContext";
+import { useDeliveryQuote } from "@/hooks/useDeliveryQuote";
 import { toast } from "@/lib/toast";
 import apiService from "@/services/apiService";
 import menuService from "@/services/menuService";
@@ -80,6 +82,12 @@ type ApiRestaurant = {
   deliveryTime?: string | { min: number; max: number };
   deliveryFee?: number;
   minimumOrder?: number;
+  reservationSettings?: {
+    isEnabled?: boolean;
+    totalSeats?: number;
+    minPartySize?: number;
+    maxPartySize?: number;
+  };
 };
 
 type ApiReviewCustomer = {
@@ -173,6 +181,8 @@ const RestaurantDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user, isAuthenticated } = useAuth();
   const { addItem, items: cartItems, updateQuantity } = useCart();
+  const { location, openPicker } = useCustomerLocation();
+  const deliveryQuote = useDeliveryQuote(id);
   const isCustomer = user?.role === "customer";
 
   const [restaurant, setRestaurant] = useState<ApiRestaurant | null>(null);
@@ -627,9 +637,21 @@ const RestaurantDetailsPage: React.FC = () => {
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Bike className="h-4 w-4" />
-                    {restaurant.deliveryFee
-                      ? `${formatTaka(restaurant.deliveryFee)} delivery`
-                      : "From ৳10 delivery"}
+                    {location && deliveryQuote.deliveryFee !== null && deliveryQuote.deliveryFee !== undefined ? (
+                      <span>
+                        {deliveryQuote.isEstimate && "~"}
+                        {formatTaka(deliveryQuote.deliveryFee)} delivery
+                        {deliveryQuote.distanceKm !== null && deliveryQuote.distanceKm !== undefined && ` (${deliveryQuote.distanceKm.toFixed(1)} km)`}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={openPicker}
+                        className="underline hover:text-white transition-colors"
+                      >
+                        Set location for live fee
+                      </button>
+                    )}
                   </span>
                 </div>
               </div>
@@ -1076,32 +1098,34 @@ const RestaurantDetailsPage: React.FC = () => {
           {/* ── Sidebar: order summary + delivery info ───────────── */}
           <aside className="lg:col-span-1">
             <div className="sticky top-28 space-y-4">
-              {/* Dine-in Table Reservation Card */}
-              <Card className="overflow-hidden border-brand-100 bg-gradient-to-br from-brand-50/70 via-white to-white p-5 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white shadow-md shadow-brand-500/20">
-                    <Calendar className="h-5 w-5" />
+              {/* Dine-in Table Reservation Card - ONLY shown when reservationSettings.isEnabled */}
+              {restaurant.reservationSettings?.isEnabled && (
+                <Card className="overflow-hidden border-brand-100 bg-gradient-to-br from-brand-50/70 via-white to-white p-5 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white shadow-md shadow-brand-500/20">
+                      <Calendar className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900">
+                        Reserve a Table
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        Dine-in seating available
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900">
-                      Reserve a Table
-                    </h3>
-                    <p className="text-xs text-gray-500">
-                      Dine-in seating available
-                    </p>
-                  </div>
-                </div>
-                <p className="mt-3 text-xs leading-relaxed text-gray-600">
-                  Book your table online in advance for instant seating and a seamless dining experience.
-                </p>
-                <Button
-                  type="button"
-                  onClick={() => setBookingModalOpen(true)}
-                  className="mt-4 w-full h-11 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold text-xs shadow-md shadow-brand-500/20"
-                >
-                  Book a Table
-                </Button>
-              </Card>
+                  <p className="mt-3 text-xs leading-relaxed text-gray-600">
+                    Book your table online in advance for instant seating and a seamless dining experience.
+                  </p>
+                  <Button
+                    type="button"
+                    onClick={() => setBookingModalOpen(true)}
+                    className="mt-4 w-full h-11 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold text-xs shadow-md shadow-brand-500/20"
+                  >
+                    Book a Table
+                  </Button>
+                </Card>
+              )}
 
               <Card className="overflow-hidden p-0">
                 <div className="border-b border-gray-100 p-5">
