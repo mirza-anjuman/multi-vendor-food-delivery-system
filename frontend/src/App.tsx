@@ -5,6 +5,7 @@ import { RiderLoader } from '@/components/loading/RiderLoader';
 import { Toaster } from '@/components/ui/sonner';
 import { LoadingProvider } from '@/contexts/LoadingContext';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { LocationProvider } from '@/contexts/LocationContext';
 import { CartProvider } from '@/contexts/CartContext';
 import { ConfirmProvider } from '@/contexts/ConfirmContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
@@ -239,7 +240,8 @@ function App(): React.ReactElement {
         <RouteProgressBar />
         <RiderLoader />
         <AuthProvider>
-          <CartProvider>
+          <LocationProvider>
+            <CartProvider>
             <ConfirmProvider>
               <SocketProvider>
                 <NotificationProvider>
@@ -617,6 +619,7 @@ function App(): React.ReactElement {
             </SocketProvider>
           </ConfirmProvider>
         </CartProvider>
+        </LocationProvider>
       </AuthProvider>
     </LoadingProvider>
   </Router>
