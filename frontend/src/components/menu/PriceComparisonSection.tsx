@@ -198,6 +198,8 @@ export const PriceComparisonSection: React.FC<PriceComparisonSectionProps> = ({
                           ? "bg-emerald-100 text-emerald-800"
                           : badge === "Top rated"
                           ? "bg-amber-100 text-amber-800"
+                          : badge === "Most rated"
+                          ? "bg-purple-100 text-purple-800"
                           : "bg-blue-100 text-blue-800"
                       )}
                     >

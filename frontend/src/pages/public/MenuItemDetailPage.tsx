@@ -268,11 +268,11 @@ const MenuItemDetailPage: React.FC = () => {
   const spice = item.spiceLevel ? SPICE_LABEL[item.spiceLevel] : undefined;
 
   return (
-    <div className="min-h-screen bg-gray-50/50 pb-36 md:pb-16 pt-20">
+    <div className="min-h-screen bg-gray-50/50 pb-36 md:pb-16">
       {/* ── Breadcrumb bar ── */}
       <nav
         aria-label="Breadcrumb"
-        className="border-b border-gray-100 bg-white/90 backdrop-blur-md sticky top-16 z-20"
+        className="border-b border-gray-100 bg-white/90 backdrop-blur-md sticky top-20 z-20"
       >
         <div className="mx-auto flex h-12 max-w-6xl items-center justify-between px-4">
           <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 truncate">
@@ -540,7 +540,7 @@ const MenuItemDetailPage: React.FC = () => {
                             Already in your cart ({totalInCart} item{totalInCart > 1 ? "s" : ""})
                           </p>
                           <p className="text-[11px] text-brand-700">
-                            Update quantity below or choose another variation.
+                            Update quantity below or choose options to add another item.
                           </p>
                         </div>
                       </div>
@@ -677,7 +677,7 @@ const MenuItemDetailPage: React.FC = () => {
                     >
                       <span>
                         {matchingCartItems.length > 0
-                          ? "Add another variation"
+                          ? (item.variants?.length ? "Add with selected options" : "Add more to cart")
                           : "Add to cart"}
                       </span>
                       <span>{formatTaka(effectivePrice)}</span>
@@ -812,12 +812,15 @@ const MenuItemDetailPage: React.FC = () => {
                   <h3 className="text-xs font-bold uppercase tracking-wider text-gray-900">
                     Kitchen Reviews
                   </h3>
-                  {restaurant?.rating?.average && (
-                    <span className="flex items-center gap-1 text-xs font-bold text-gray-800">
-                      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                      {restaurant.rating.average.toFixed(1)} ({restaurant.rating.count || reviews.length})
-                    </span>
-                  )}
+                  {typeof restaurant?.rating?.average === "number" &&
+                    typeof restaurant?.rating?.count === "number" &&
+                    restaurant.rating.count > 0 && (
+                      <span className="flex items-center gap-1 text-xs font-bold text-gray-800">
+                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                        {restaurant.rating.average.toFixed(1)} ({restaurant.rating.count}{" "}
+                        {restaurant.rating.count === 1 ? "rating" : "ratings"})
+                      </span>
+                    )}
                 </div>
 
                 <div className="space-y-3">

@@ -245,17 +245,34 @@ export async function getDishComparison(
     }
   }
 
-  // Top rated
+  // Top rated (must have at least 1 review; highest average rating wins; tie-broken by review count)
   const entriesWithRating = allEntries.filter(
-    (e) => (e.restaurant.rating?.average || 0) >= 4.0 && (e.restaurant.rating?.count || 0) >= 5
+    (e) => (e.restaurant.rating?.average || 0) >= 4.0 && (e.restaurant.rating?.count || 0) >= 1
   );
   if (entriesWithRating.length > 0) {
-    const maxRating = Math.max(...entriesWithRating.map((e) => e.restaurant.rating!.average!));
-    for (const e of entriesWithRating) {
-      if (e.restaurant.rating?.average === maxRating) {
-        e.highlights.push("Top rated");
-        break; // Only give to top one
-      }
+    const sortedByRating = [...entriesWithRating].sort((a, b) => {
+      const avgDiff = (b.restaurant.rating?.average || 0) - (a.restaurant.rating?.average || 0);
+      if (Math.abs(avgDiff) > 0.01) return avgDiff;
+      return (b.restaurant.rating?.count || 0) - (a.restaurant.rating?.count || 0);
+    });
+
+    const topOne = sortedByRating[0];
+    if (topOne && !topOne.highlights.includes("Top rated")) {
+      topOne.highlights.push("Top rated");
+    }
+  }
+
+  // Most rated (popular by review count, distinct from Top rated)
+  const entriesByReviewCount = allEntries.filter(
+    (e) => (e.restaurant.rating?.count || 0) >= 10
+  );
+  if (entriesByReviewCount.length > 0) {
+    const sortedByCount = [...entriesByReviewCount].sort(
+      (a, b) => (b.restaurant.rating?.count || 0) - (a.restaurant.rating?.count || 0)
+    );
+    const mostReviewed = sortedByCount[0];
+    if (mostReviewed && !mostReviewed.highlights.includes("Top rated") && !mostReviewed.highlights.includes("Most rated")) {
+      mostReviewed.highlights.push("Most rated");
     }
   }
 

@@ -215,7 +215,7 @@ export const LoadingProvider: React.FC<{ children: React.ReactNode }> = ({
     };
 
     const handlePopState = () => {
-      startNavigation();
+      resetNavigation();
       resetBlocking();
     };
 
