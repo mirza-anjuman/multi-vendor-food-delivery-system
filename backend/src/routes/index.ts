@@ -26,6 +26,7 @@ import emailRoutes from "./email.routes";
 import userRoutes from "./user.routes";
 import vendorRoutes from "./vendor.routes";
 import deliveryRoutes from "./delivery.routes";
+import menuItemFeaturesRoutes from "./menu-item-features.routes";
 
 const router: Router = Router();
 
@@ -33,6 +34,7 @@ router.use("/delivery", deliveryRoutes);
 router.use("/email", emailRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/reservations", reservationRoutes);
+router.use("/menu-items", menuItemFeaturesRoutes);
 
 router.use("/auth", authRoutes);
 router.use("/users", userRoutes);
