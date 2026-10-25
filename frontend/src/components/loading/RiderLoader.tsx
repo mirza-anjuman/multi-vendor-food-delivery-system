@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { useLoading } from '@/contexts/LoadingContext';
+import { useLoading, cleanupDomLocks } from '@/contexts/LoadingContext';
 import { Button } from '@/components/ui/button';
 import { AlertCircle } from 'lucide-react';
 import { DeliveryRiderScene } from '@/components/loading/DeliveryRiderScene';
@@ -62,8 +62,17 @@ export const RiderLoader: React.FC = () => {
           previouslyFocusedElementRef.current.focus();
         }
       };
+    } else {
+      cleanupDomLocks();
     }
   }, [isBlockingVisible]);
+
+  // Safety net on unmount
+  useEffect(() => {
+    return () => {
+      cleanupDomLocks();
+    };
+  }, []);
 
   if (!isBlockingVisible || !activeOperation) {
     return null;

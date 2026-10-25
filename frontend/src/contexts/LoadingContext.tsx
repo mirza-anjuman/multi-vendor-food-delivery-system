@@ -46,6 +46,7 @@ export interface LoadingContextValue {
   ) => Promise<T>;
   show: (options?: BlockingLoaderOptions) => string;
   hide: (id: string) => void;
+  resetBlocking: () => void;
 
   // State exposed to overlay component
   activeOperation: ActiveBlockingOperation | null;
@@ -66,6 +67,17 @@ export const LOADING_TIMING = {
   BLOCKING_MIN_DURATION_MS: 600, // Once visible, stay at least 600ms so animation reads
   BLOCKING_DEFAULT_TIMEOUT_MS: 30000, // 30s stuck guard timeout
 } as const;
+
+export const cleanupDomLocks = () => {
+  if (typeof document === 'undefined') return;
+  const rootEl = document.getElementById('root');
+  if (rootEl) {
+    rootEl.removeAttribute('aria-busy');
+    rootEl.removeAttribute('inert');
+  }
+  document.body.style.overflow = '';
+  document.body.style.paddingRight = '';
+};
 
 const LoadingContext = createContext<LoadingContextValue | null>(null);
 
@@ -138,7 +150,40 @@ export const LoadingProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
-  // Listen to browser navigation intent (pushState, replaceState, popstate)
+  // ── 2. Blocking Rider Loader State ─────────────────────────────────
+  const [operations, setOperations] = useState<ActiveBlockingOperation[]>([]);
+  const [isBlockingVisible, setIsBlockingVisible] = useState(false);
+  const [isTakingLonger, setIsTakingLonger] = useState(false);
+
+  const activeOpRef = useRef<ActiveBlockingOperation | null>(null);
+  const lastActiveOpRef = useRef<ActiveBlockingOperation | null>(null);
+  const blockingShownAtRef = useRef<number | null>(null);
+  const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetBlocking = useCallback(() => {
+    if (showTimerRef.current) {
+      clearTimeout(showTimerRef.current);
+      showTimerRef.current = null;
+    }
+    if (timeoutTimerRef.current) {
+      clearTimeout(timeoutTimerRef.current);
+      timeoutTimerRef.current = null;
+    }
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+    blockingShownAtRef.current = null;
+    setOperations([]);
+    setIsBlockingVisible(false);
+    setIsTakingLonger(false);
+    lastActiveOpRef.current = null;
+    cleanupDomLocks();
+  }, []);
+
+  // Listen to browser navigation intent (pushState, replaceState, popstate, pageshow)
   useEffect(() => {
     const originalPushState = window.history.pushState;
     const originalReplaceState = window.history.replaceState;
@@ -171,29 +216,31 @@ export const LoadingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const handlePopState = () => {
       startNavigation();
+      resetBlocking();
+    };
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        resetNavigation();
+        resetBlocking();
+      }
     };
 
     window.addEventListener('popstate', handlePopState);
+    window.addEventListener('pageshow', handlePageShow);
 
     return () => {
       window.history.pushState = originalPushState;
       window.history.replaceState = originalReplaceState;
       window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('pageshow', handlePageShow);
     };
-  }, [startNavigation]);
+  }, [startNavigation, resetNavigation, resetBlocking]);
 
-  // ── 2. Blocking Rider Loader State ─────────────────────────────────
-  const [operations, setOperations] = useState<ActiveBlockingOperation[]>([]);
-  const [isBlockingVisible, setIsBlockingVisible] = useState(false);
-  const [isTakingLonger, setIsTakingLonger] = useState(false);
-
-  const activeOpRef = useRef<ActiveBlockingOperation | null>(null);
-  const blockingShownAtRef = useRef<number | null>(null);
-  const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Derive most recent active operation
-  const currentActiveOp = operations.length > 0 ? operations[operations.length - 1] : null;
+  // Derive most recent active operation (preserve during fade-out to prevent flicker)
+  const currentActiveOp = operations.length > 0
+    ? operations[operations.length - 1]
+    : (isBlockingVisible ? lastActiveOpRef.current : null);
   activeOpRef.current = currentActiveOp;
 
   const show = useCallback((options?: BlockingLoaderOptions): string => {
@@ -250,6 +297,12 @@ export const LoadingProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     if (operations.length > 0) {
       const op = operations[operations.length - 1];
+      lastActiveOpRef.current = op;
+
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
 
       // Schedule display after delay if not already visible
       if (!isBlockingVisible && !showTimerRef.current) {
@@ -280,17 +333,27 @@ export const LoadingProvider: React.FC<{ children: React.ReactNode }> = ({
       if (blockingShownAtRef.current !== null) {
         // Enforce minimum display duration so animation is never cut abruptly
         const elapsed = Date.now() - blockingShownAtRef.current;
-        const opMin = activeOpRef.current?.minDurationMs ?? LOADING_TIMING.BLOCKING_MIN_DURATION_MS;
+        const opMin = lastActiveOpRef.current?.minDurationMs ?? LOADING_TIMING.BLOCKING_MIN_DURATION_MS;
         const remaining = Math.max(0, opMin - elapsed);
 
-        const hideTimer = setTimeout(() => {
+        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = setTimeout(() => {
           setIsBlockingVisible(false);
           blockingShownAtRef.current = null;
+          lastActiveOpRef.current = null;
+          cleanupDomLocks();
         }, remaining);
 
-        return () => clearTimeout(hideTimer);
+        return () => {
+          if (hideTimerRef.current) {
+            clearTimeout(hideTimerRef.current);
+            hideTimerRef.current = null;
+          }
+        };
       } else {
         setIsBlockingVisible(false);
+        lastActiveOpRef.current = null;
+        cleanupDomLocks();
       }
     }
   }, [operations, isBlockingVisible]);
@@ -305,6 +368,7 @@ export const LoadingProvider: React.FC<{ children: React.ReactNode }> = ({
       run,
       show,
       hide,
+      resetBlocking,
       activeOperation: currentActiveOp,
       isBlockingVisible,
       isTakingLonger,
@@ -319,12 +383,19 @@ export const LoadingProvider: React.FC<{ children: React.ReactNode }> = ({
       run,
       show,
       hide,
+      resetBlocking,
       currentActiveOp,
       isBlockingVisible,
       isTakingLonger,
       cancelActiveOperation,
     ],
   );
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as unknown as { __foodrush_loading?: LoadingContextValue }).__foodrush_loading = value;
+    }
+  }, [value]);
 
   return <LoadingContext.Provider value={value}>{children}</LoadingContext.Provider>;
 };

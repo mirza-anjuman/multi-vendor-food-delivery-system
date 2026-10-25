@@ -93,8 +93,6 @@ const Navbar: React.FC = memo(() => {
     { name: 'Home', path: '/' },
     { name: 'Menu', path: '/menu' },
     { name: 'Restaurants', path: '/restaurants' },
-    { name: 'About', path: '/about' },
-    { name: 'Contact Us', path: '/contact' },
   ];
 
   // Handle scroll effect
