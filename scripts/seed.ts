@@ -139,10 +139,21 @@ interface ScrapedRestaurant {
 
 // ── Helpers ─────────────────────────────────────────────────────
 
-function downloadFile(url: string, dest: string): Promise<boolean> {
+type DownloadResult = 'downloaded' | 'skipped' | 'failed';
+
+function downloadFile(url: string, dest: string): Promise<DownloadResult> {
   return new Promise((resolve) => {
+    try {
+      if (fs.existsSync(dest) && fs.statSync(dest).size > 0) {
+        resolve('skipped');
+        return;
+      }
+    } catch {
+      // Continue with the download if the existing file cannot be inspected.
+    }
+
     if (!url || !url.startsWith('http')) {
-      resolve(false);
+      resolve('failed');
       return;
     }
     const mod = url.startsWith('https') ? https : http;
@@ -158,25 +169,25 @@ function downloadFile(url: string, dest: string): Promise<boolean> {
         if (res.statusCode !== 200) {
           file.close();
           try { fs.unlinkSync(dest); } catch {}
-          resolve(false);
+          resolve('failed');
           return;
         }
         res.pipe(file);
         file.on('finish', () => {
           file.close();
-          resolve(true);
+          resolve('downloaded');
         });
       })
       .on('error', () => {
         file.close();
         try { fs.unlinkSync(dest); } catch {}
-        resolve(false);
+        resolve('failed');
       })
       .on('timeout', () => {
         req.destroy();
         file.close();
         try { fs.unlinkSync(dest); } catch {}
-        resolve(false);
+        resolve('failed');
       });
   });
 }
@@ -184,16 +195,20 @@ function downloadFile(url: string, dest: string): Promise<boolean> {
 async function downloadBatch(
   items: { url: string; dest: string }[],
   concurrency = 10,
-): Promise<number> {
-  let success = 0;
+): Promise<Record<DownloadResult, number>> {
+  const counts: Record<DownloadResult, number> = {
+    downloaded: 0,
+    skipped: 0,
+    failed: 0,
+  };
   for (let i = 0; i < items.length; i += concurrency) {
     const batch = items.slice(i, i + concurrency);
     const results = await Promise.all(
       batch.map((item) => downloadFile(item.url, item.dest)),
     );
-    success += results.filter(Boolean).length;
+    for (const result of results) counts[result]++;
   }
-  return success;
+  return counts;
 }
 
 function slugify(name: string): string {
@@ -219,6 +234,11 @@ function sanitizeForEmail(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '')
     .slice(0, 20);
+}
+
+function validSeedFirstName(name: string, fallback: string): string {
+  const firstName = name.trim().split(/\s+/)[0]?.slice(0, 30) || '';
+  return firstName.length >= 2 ? firstName : fallback;
 }
 
 function generateDefaultHours() {
@@ -968,6 +988,30 @@ const isRestaurant = (r: ScrapedRestaurant): boolean => {
   return !NON_RESTAURANT_PATTERNS.some((p) => p.test(r.name));
 };
 
+async function clearDatabase(db: NonNullable<typeof mongoose.connection.db>): Promise<void> {
+  try {
+    await db.dropDatabase();
+    console.log(c(ANSI.yellow, 'Database dropped. Seeding...\n'));
+  } catch (error) {
+    const mongoError = error as { code?: number; codeName?: string };
+    if (mongoError.code !== 8000) {
+      throw error;
+    }
+
+    console.log(
+      c(
+        ANSI.yellow,
+        'Database drop is not permitted for this MongoDB user; clearing collections instead...',
+      ),
+    );
+    const collections = await db.listCollections().toArray();
+    for (const collection of collections) {
+      await db.collection(collection.name).deleteMany({});
+    }
+    console.log(c(ANSI.yellow, 'Collections cleared. Seeding...\n'));
+  }
+}
+
 const seedDatabase = async (): Promise<void> => {
   const mongoDbUri = process.env.MONGODB_URI;
   if (!mongoDbUri) {
@@ -983,8 +1027,7 @@ const seedDatabase = async (): Promise<void> => {
     if (!db) throw new Error('Database handle is undefined after connecting.');
 
     console.log(c(ANSI.cyan, 'Dropping database...'));
-    await db.dropDatabase();
-    console.log(c(ANSI.yellow, 'Database dropped. Seeding...\n'));
+    await clearDatabase(db);
 
     // ── Create image directories ──────────────────────────────
     [HERO_DIR, LOGO_DIR].forEach((dir) => {
@@ -1042,11 +1085,11 @@ const seedDatabase = async (): Promise<void> => {
         });
       }
     }
-    const downloaded = await downloadBatch(downloads, 15);
+    const downloadCounts = await downloadBatch(downloads, 15);
     console.log(
       c(
         ANSI.green,
-        `✓ Downloaded ${downloaded}/${downloads.length} images`,
+        `✓ Images: ${downloadCounts.downloaded} downloaded, ${downloadCounts.skipped} already existed, ${downloadCounts.failed} failed`,
       ),
     );
 
@@ -1072,7 +1115,7 @@ const seedDatabase = async (): Promise<void> => {
       vendorUsers.push({
         email: `vendor.${r.code}@seed.com`,
         password: 'Vendor@123456',
-        firstName: r.name.split(' ')[0].slice(0, 30),
+        firstName: validSeedFirstName(r.name, 'Vendor'),
         lastName: 'Owner',
         role: UserRole.VENDOR,
         isEmailVerified: true,
@@ -1165,7 +1208,7 @@ const seedDatabase = async (): Promise<void> => {
         averageRating: data.rating,
       });
     }
-    await VendorProfile.insertMany(vendorProfiles, { ordered: false }).catch(() => VendorProfile.insertMany(vendorProfiles));
+    await VendorProfile.insertMany(vendorProfiles);
     console.log(c(ANSI.green, `✓ ${vendorProfiles.length} vendor profiles created`));
 
     // ── Create menu categories & items ────────────────────────
@@ -1193,7 +1236,7 @@ const seedDatabase = async (): Promise<void> => {
       }
     }
 
-    const createdCategories = await MenuCategory.insertMany(allCategories, { ordered: false }).catch(() => MenuCategory.insertMany(allCategories));
+    const createdCategories = await MenuCategory.insertMany(allCategories);
     console.log(c(ANSI.green, `✓ ${createdCategories.length} menu categories created`));
 
     // Create menu items (need category IDs)
@@ -1242,7 +1285,7 @@ const seedDatabase = async (): Promise<void> => {
       restaurantMenuItems.set(rid, menuItemsForRestaurant);
     }
 
-    const createdMenuItems = await MenuItem.insertMany(allMenuItems, { ordered: false }).catch(() => MenuItem.insertMany(allMenuItems));
+    const createdMenuItems = await MenuItem.insertMany(allMenuItems);
     console.log(c(ANSI.green, `✓ ${createdMenuItems.length} menu items created`));
 
     // Map menu items back to restaurants
@@ -1282,7 +1325,7 @@ const seedDatabase = async (): Promise<void> => {
       customerUsersData.push({
         email: info.email,
         password: hashedReviewerPassword,
-        firstName: info.name.slice(0, 30),
+        firstName: validSeedFirstName(info.name, 'Customer'),
         lastName: 'User',
         role: UserRole.CUSTOMER,
         isEmailVerified: true,
@@ -1291,11 +1334,11 @@ const seedDatabase = async (): Promise<void> => {
       });
     }
 
-    const createdCustomerUsers = await User.insertMany(customerUsersData, { ordered: false }).catch(() => User.insertMany(customerUsersData));
+    const createdCustomerUsers = await User.insertMany(customerUsersData);
 
     // Create customer profiles
     const customerProfiles = createdCustomerUsers.map((u) => ({ userId: u._id }));
-    await CustomerProfile.insertMany(customerProfiles, { ordered: false }).catch(() => CustomerProfile.insertMany(customerProfiles));
+    await CustomerProfile.insertMany(customerProfiles);
 
     // Map reviewer name → user ID
     const reviewerUserMap = new Map<string, any>();
@@ -1387,7 +1430,6 @@ const seedDatabase = async (): Promise<void> => {
         allReviews.push({
           customerId: customerUser._id,
           restaurantId: restaurant._id,
-          orderId: null, // will be set after orders are created
           rating: rev.rating,
           comment: rev.text.slice(0, 1000),
           images: [],
@@ -1458,7 +1500,7 @@ const seedDatabase = async (): Promise<void> => {
     }
 
     // Batch insert orders
-    const createdOrders = await Order.insertMany(allOrders, { ordered: false }).catch(() => Order.insertMany(allOrders));
+    const createdOrders = await Order.insertMany(allOrders);
     console.log(c(ANSI.green, `✓ ${createdOrders.length} orders created`));
 
     // Link reviews to orders
@@ -1467,7 +1509,8 @@ const seedDatabase = async (): Promise<void> => {
     }
 
     // Batch insert reviews
-    const createdReviews = await Review.insertMany(allReviews, { ordered: false }).catch(() => Review.insertMany(allReviews));
+    await Review.syncIndexes();
+    const createdReviews = await Review.insertMany(allReviews);
     console.log(c(ANSI.green, `✓ ${createdReviews.length} reviews created`));
 
     // ── Update restaurant order counts ────────────────────────

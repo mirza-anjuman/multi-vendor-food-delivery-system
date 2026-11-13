@@ -84,8 +84,14 @@ const reviewSchema = new Schema<IReview>(
 );
 
 // One review per order or per reservation
-reviewSchema.index({ customerId: 1, orderId: 1 }, { unique: true, sparse: true });
-reviewSchema.index({ customerId: 1, reservationId: 1 }, { unique: true, sparse: true });
+reviewSchema.index(
+  { customerId: 1, orderId: 1 },
+  { unique: true, partialFilterExpression: { orderId: { $exists: true } } },
+);
+reviewSchema.index(
+  { customerId: 1, reservationId: 1 },
+  { unique: true, partialFilterExpression: { reservationId: { $exists: true } } },
+);
 reviewSchema.index({ restaurantId: 1, createdAt: -1 });
 
 const Review: Model<IReview> = mongoose.model<IReview>("Review", reviewSchema);
