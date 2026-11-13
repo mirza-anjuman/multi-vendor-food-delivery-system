@@ -2,6 +2,7 @@ import React, { memo, useCallback, useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowUpDown,
+  CheckCircle2,
   Clock,
   ExternalLink,
   Heart,
@@ -14,6 +15,7 @@ import {
   Store,
   Tag,
   Truck,
+  XCircle,
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -278,6 +280,22 @@ export const VendorSelectionSheet: React.FC<VendorSelectionSheetProps> = memo(
                           Top Choice
                         </span>
                       )}
+
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
+                          vendor.isOpen
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-gray-100 text-gray-500",
+                        )}
+                      >
+                        {vendor.isOpen ? (
+                          <CheckCircle2 className="w-3 h-3" />
+                        ) : (
+                          <XCircle className="w-3 h-3" />
+                        )}
+                        {vendor.isOpen ? "Open now" : "Closed"}
+                      </span>
                     </div>
 
                     {onToggleFavorite && (

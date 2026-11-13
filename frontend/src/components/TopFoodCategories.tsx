@@ -169,7 +169,7 @@ const TopFoodCategories: React.FC = () => {
                   <SwiperSlide key={category.name}>
                     <motion.button
                       type="button"
-                      onClick={() => navigate(`/restaurants?q=${encodeURIComponent(category.name)}`)}
+                      onClick={() => navigate(`/menu?categories=${encodeURIComponent(category.name)}`)}
                       className="relative rounded-2xl overflow-hidden shadow-sm h-64 w-full block"
                       whileHover={{ y: -6 }}
                       transition={{ duration: 0.25 }}

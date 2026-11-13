@@ -67,7 +67,7 @@ export const FoodCard: React.FC<FoodCardProps> = memo(
     }, [item.variants, item.addons]);
 
     const isAvailable =
-      item.isAvailable && item.stockStatus !== "out_of_stock" && item.isOpen;
+      item.isAvailable && item.stockStatus !== "out_of_stock";
 
     const discountPercent = useMemo(() => {
       if (item.originalPrice && item.originalPrice > item.price) {
@@ -192,6 +192,12 @@ export const FoodCard: React.FC<FoodCardProps> = memo(
                 <span className="truncate">{item.restaurantName}</span>
               </Link>
             </InteractiveCardAction>
+
+            {!item.isOpen && (
+              <span className="text-[11px] font-semibold text-gray-500 flex-shrink-0">
+                Closed
+              </span>
+            )}
 
             {item.rating > 0 && (
               <div className="flex items-center gap-1 font-semibold text-gray-700 flex-shrink-0">

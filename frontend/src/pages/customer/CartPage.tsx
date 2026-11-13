@@ -22,6 +22,7 @@ import { Link, useNavigate } from "react-router-dom";
 import deliveryService, {
   type ActiveDeliveryCampaign,
 } from "@/services/deliveryService";
+import exploreService from "@/services/exploreService";
 
 const CartPage: React.FC = () => {
   const {
@@ -47,6 +48,83 @@ const CartPage: React.FC = () => {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [promoDraft, setPromoDraft] = useState(promoCode);
   const [activeCampaigns, setActiveCampaigns] = useState<ActiveDeliveryCampaign[]>([]);
+  const [unavailableItemKeys, setUnavailableItemKeys] = useState<Set<string>>(
+    new Set(),
+  );
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(true);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (items.length === 0) {
+      setUnavailableItemKeys(new Set());
+      setIsCheckingAvailability(false);
+      setAvailabilityError(null);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setIsCheckingAvailability(true);
+    setAvailabilityError(null);
+
+    const restaurantIds = [...new Set(items.map((item) => item.restaurantId))];
+    exploreService
+      .getMenuItems({ restaurantIds, limit: 5000 })
+      .then((response) => {
+        if (!isMounted) return;
+
+        if (!response.success || !response.data) {
+          setUnavailableItemKeys(
+            new Set(items.map((item) => item.itemKey || item.menuItemId)),
+          );
+          setAvailabilityError(
+            response.message ||
+              "We could not verify your cart items. Please try again.",
+          );
+          return;
+        }
+
+        const availableItems = new Set(
+          response.data.items
+            .filter(
+              (item) =>
+                item.isAvailable &&
+                item.stockStatus !== "out_of_stock" &&
+                item.stockStatus !== "hidden" &&
+                item.isOpen,
+            )
+            .map((item) => `${item.restaurantId}::${item._id}`),
+        );
+        setUnavailableItemKeys(
+          new Set(
+            items
+              .filter(
+                (item) =>
+                  !availableItems.has(`${item.restaurantId}::${item.menuItemId}`),
+              )
+              .map((item) => item.itemKey || item.menuItemId),
+          ),
+        );
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setUnavailableItemKeys(
+          new Set(items.map((item) => item.itemKey || item.menuItemId)),
+        );
+        setAvailabilityError(
+          "We could not verify your cart items. Please try again.",
+        );
+      })
+      .finally(() => {
+        if (isMounted) setIsCheckingAvailability(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [items]);
 
   useEffect(() => {
     let isMounted = true;
@@ -117,6 +195,9 @@ const CartPage: React.FC = () => {
     : false;
 
   const isMultiRestaurant = itemsByRestaurant.length > 1;
+  const hasUnavailableItems = unavailableItemKeys.size > 0;
+  const canProceedToCheckout =
+    !isCheckingAvailability && !availabilityError && !hasUnavailableItems;
 
   /* ── Empty State ────────────────────────────────────────────── */
   if (items.length === 0) {
@@ -183,6 +264,20 @@ const CartPage: React.FC = () => {
             </Button>
           </div>
 
+          {(isCheckingAvailability || availabilityError || hasUnavailableItems) && (
+            <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <p className="font-semibold">
+                {isCheckingAvailability
+                  ? "Checking item availability…"
+                  : "Some cart items are currently unavailable."}
+              </p>
+              <p className="mt-1">
+                {availabilityError ||
+                  "Remove unavailable items before proceeding to checkout."}
+              </p>
+            </div>
+          )}
+
           {/* Multi-restaurant header */}
           {isMultiRestaurant && (
             <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
@@ -216,6 +311,7 @@ const CartPage: React.FC = () => {
                     <AnimatePresence mode="popLayout">
                       {group.items.map((item, idx) => {
                         const itemKey = item.itemKey || item.menuItemId;
+                        const isUnavailable = unavailableItemKeys.has(itemKey);
                         return (
                           <motion.div
                             key={itemKey}
@@ -237,7 +333,11 @@ const CartPage: React.FC = () => {
                               delay: idx * 0.03,
                             }}
                           >
-                            <Card className="overflow-hidden bg-white border-gray-100 hover:shadow-md transition-shadow">
+                            <Card
+                              className={`overflow-hidden bg-white border-gray-100 hover:shadow-md transition-shadow ${
+                                isUnavailable ? "border-amber-300 ring-1 ring-amber-200" : ""
+                              }`}
+                            >
                               <FoodItemCard
                                 variant="cart"
                                 item={{
@@ -460,6 +560,7 @@ const CartPage: React.FC = () => {
 
                   <Button
                     className="w-full mt-5 bg-orange-500 hover:bg-orange-600 shadow-sm shadow-orange-200 font-semibold h-11 text-sm"
+                    disabled={!canProceedToCheckout}
                     onClick={() =>
                       navigate(isAuthenticated ? "/checkout" : "/login")
                     }
