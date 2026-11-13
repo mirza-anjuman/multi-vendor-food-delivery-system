@@ -101,7 +101,7 @@ export const LocationModal: React.FC = () => {
 
   return (
     <Dialog open={isPickerOpen} onOpenChange={(open) => !open && closePicker()}>
-      <DialogContent className="sm:max-w-xl max-h-[92vh] overflow-y-auto p-4 sm:p-6 rounded-3xl border border-gray-100 shadow-2xl">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-xl max-h-[92vh] overflow-x-hidden overflow-y-auto p-4 sm:p-6 rounded-3xl border border-gray-100 shadow-2xl">
         <DialogHeader className="space-y-1.5 pb-2 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-orange-100 text-brand-600">
@@ -271,7 +271,7 @@ export const LocationModal: React.FC = () => {
               <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
                 Selected Delivery Location
               </p>
-              <p className="font-semibold text-gray-900 truncate mt-0.5">
+              <p className="mt-0.5 whitespace-normal break-words font-semibold leading-relaxed text-gray-900">
                 {picked.address || `${picked.latitude.toFixed(4)}, ${picked.longitude.toFixed(4)}`}
               </p>
             </div>

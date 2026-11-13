@@ -137,28 +137,40 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const newLoc: UserCoordinates = {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            addressText: "Current location",
-            source: "browser_gps",
-          };
-          setLocation(newLoc);
-          toast.success("Location updated from your device GPS");
-          resolve(true);
-        },
-        (err) => {
-          toast.error(
-            err.code === 1
-              ? "Location permission denied"
-              : "Unable to retrieve your location"
-          );
+      const handleSuccess = (pos: GeolocationPosition) => {
+        const newLoc: UserCoordinates = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          addressText: "Current location",
+          source: "browser_gps",
+        };
+        setLocation(newLoc);
+        toast.success("Location updated from your device GPS");
+        resolve(true);
+      };
+
+      const handleError = (err: GeolocationPositionError) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          toast.error("Location permission denied. Allow location access in your browser settings and try again.");
           resolve(false);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-      );
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          handleSuccess,
+          () => {
+            toast.error("Unable to retrieve your location. Please check your browser permissions or choose a point on the map.");
+            resolve(false);
+          },
+          { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 },
+        );
+      };
+
+      navigator.geolocation.getCurrentPosition(handleSuccess, handleError, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      });
     });
   }, [setLocation]);
 

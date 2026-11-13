@@ -61,12 +61,14 @@ export interface ActiveDeliveryCampaign {
 }
 
 export interface GeocodingAddress {
-  displayName: string;
-  lat: number;
-  lng: number;
+  formattedAddress: string;
+  latitude: number;
+  longitude: number;
   street?: string;
+  houseNumber?: string;
   area?: string;
   district?: string;
+  city?: string;
   postcode?: string;
 }
 

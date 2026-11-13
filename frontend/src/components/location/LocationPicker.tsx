@@ -149,7 +149,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         const res = await deliveryService.geocodeReverse(lat, lng);
         const addr = res.data?.address ?? res.data?.result;
         if (res.success && addr) {
-          const display = addr.displayName || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+          const display = addr.formattedAddress || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
           setResolvedLabel(display);
           onChange({
             latitude: lat,
@@ -227,15 +227,15 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
   };
 
   const handleSelectSearchResult = (result: GeocodingAddress) => {
-    setSearchQuery(result.displayName);
+    setSearchQuery(result.formattedAddress);
     setShowResultsDropdown(false);
-    setPosition([result.lat, result.lng]);
+    setPosition([result.latitude, result.longitude]);
     setHasPinned(true);
-    setResolvedLabel(result.displayName);
+    setResolvedLabel(result.formattedAddress);
     onChange({
-      latitude: result.lat,
-      longitude: result.lng,
-      address: result.displayName,
+      latitude: result.latitude,
+      longitude: result.longitude,
+      address: result.formattedAddress,
       street: result.street,
       area: result.area,
       district: result.district,
@@ -251,18 +251,32 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
     }
 
     setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
+    const handleSuccess = (pos: GeolocationPosition) => {
+      setIsLocating(false);
+      handleLocationUpdate(pos.coords.latitude, pos.coords.longitude);
+    };
+    const handleError = (error: GeolocationPositionError) => {
+      if (error.code === error.PERMISSION_DENIED) {
         setIsLocating(false);
-        const { latitude, longitude } = pos.coords;
-        handleLocationUpdate(latitude, longitude);
-      },
-      () => {
-        setIsLocating(false);
-        alert("Unable to retrieve your location. Please check your browser permissions or click directly on the map.");
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
-    );
+        alert("Location permission was denied. Allow location access in your browser settings and try again.");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        handleSuccess,
+        () => {
+          setIsLocating(false);
+          alert("Unable to retrieve your location. Please check your browser permissions or click directly on the map.");
+        },
+        { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 },
+      );
+    };
+
+    navigator.geolocation.getCurrentPosition(handleSuccess, handleError, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 60000,
+    });
   };
 
   // Marker drag end handler
@@ -278,7 +292,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
   );
 
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("min-w-0 max-w-full space-y-2", className)}>
       <div className="flex items-center justify-between">
         {label && (
           <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
@@ -342,7 +356,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         <div className="space-y-2">
           {/* Search bar & Locate Me button */}
           {(showSearch || showLocateMe) && (
-            <div className="flex items-center gap-2 relative">
+            <div className="relative flex min-w-0 items-center gap-2">
               {showSearch && (
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -366,13 +380,15 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
                     <div className="absolute top-full left-0 right-0 z-[1000] mt-1 bg-popover text-popover-foreground border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                       {searchResults.map((item, idx) => (
                         <button
-                          key={`${item.lat}-${item.lng}-${idx}`}
+                          key={`${item.latitude}-${item.longitude}-${idx}`}
                           type="button"
                           onClick={() => handleSelectSearchResult(item)}
                           className="w-full text-left px-3 py-2.5 text-xs hover:bg-accent hover:text-accent-foreground flex items-start gap-2 border-b border-border/50 last:border-0 min-h-[44px]"
                         >
                           <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                          <span className="line-clamp-2">{item.displayName}</span>
+                          <span className="min-w-0 whitespace-normal break-words line-clamp-2">
+                            {item.formattedAddress}
+                          </span>
                         </button>
                       ))}
                     </div>
@@ -454,7 +470,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         <div className="flex items-start gap-2 p-2.5 bg-muted/50 rounded-md border border-border text-xs">
           <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-foreground truncate">
+            <p className="whitespace-normal break-words font-medium leading-relaxed text-foreground">
               {resolvedLabel || "Pinned location"}
             </p>
             <p className="text-muted-foreground text-[11px]">
